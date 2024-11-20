@@ -16,7 +16,7 @@ app.use(cors({
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json({ extended: true }));
 app.get('/', (req, res) => {
-    res.send("url hit sucessfully").status(200);
+    res.send("url hit sucessfully");
 })
 
 // Initialize Socket.IO
