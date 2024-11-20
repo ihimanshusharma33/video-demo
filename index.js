@@ -15,7 +15,7 @@ app.use(cors({
 }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json({ extended: true }));
-server.get('/', (req, res) => {
+app.get('/', (req, res) => {
     res.send("url hit sucessfully");
 })
 
