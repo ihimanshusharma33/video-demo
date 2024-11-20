@@ -8,6 +8,7 @@
   "devDependencies": {
     "nodemon": "^3.1.7"
   },
+
   "name": "video-backend",
   "version": "1.0.0",
   "main": "index.js",
