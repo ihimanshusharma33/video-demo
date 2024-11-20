@@ -16,7 +16,7 @@ app.use(cors({
 // Initialize Socket.IO
 const io = new Server(server, {
     cors: {
-        origin: "http://127.0.0.1:5500",
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
@@ -27,7 +27,9 @@ io.on('connection', (socket) => {
 
     // Handle joining a room
     socket.on('join-room', (roomId) => {
+        // If the room doesn't exist, create it
         if (!rooms[roomId]) {
+            // Create an empty array to store users
             rooms[roomId] = [];
         }
 
