@@ -5,9 +5,10 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 // Initialize Express
 const app = express();
+ // creating server from express
 const server = createServer(app);
 
-
+const port = process.env.PORT || 3000;
 // Configure CORS
 app.use(cors({
     origin: "*",   // Update this if hosting frontend elsewhere
@@ -90,6 +91,6 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(3000, () => {
-    console.log('Server is running on http://localhost:3000');
+server.listen(port, () => {
+    console.log('Server is running');
 });
