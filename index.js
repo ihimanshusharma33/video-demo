@@ -7,13 +7,10 @@ import bodyParser from 'body-parser';
 const app = express();
  // creating server from express
 const server = createServer(app);
-
 const port = process.env.PORT || 3000;
 // Configure CORS
-app.use(cors({
-    origin: "*",   // Update this if hosting frontend elsewhere
-    methods: ["GET", "POST"]
-}));
+
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json({ extended: true }));
 app.get('/', (req, res) => {
@@ -21,12 +18,7 @@ app.get('/', (req, res) => {
 })
 
 // Initialize Socket.IO
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+const io = new Server(server);
 
 const rooms = {}; // Store room information
 
