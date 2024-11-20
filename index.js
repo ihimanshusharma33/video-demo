@@ -7,11 +7,15 @@ import cors from 'cors';
 const app = express();
 const server = createServer(app);
 
+
 // Configure CORS
 app.use(cors({
     origin: "*",   // Update this if hosting frontend elsewhere
     methods: ["GET", "POST"]
 }));
+app.get('/', (req, res) => {
+    res.send("url hit sucessfully").status(200);
+})
 
 // Initialize Socket.IO
 const io = new Server(server, {
@@ -20,6 +24,7 @@ const io = new Server(server, {
         methods: ["GET", "POST"]
     }
 });
+
 const rooms = {}; // Store room information
 
 io.on('connection', (socket) => {
