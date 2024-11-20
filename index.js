@@ -9,7 +9,6 @@ const app = express();
 const server = createServer(app);
 const port = process.env.PORT || 3000;
 // Configure CORS
-
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json({ extended: true }));
@@ -18,7 +17,15 @@ app.get('/', (req, res) => {
 })
 
 // Initialize Socket.IO
-const io = new Server(server);
+const io = new Server(server, {
+    transports: ["websocket"],
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+        allowedHeaders: ["*"],
+        credentials: true
+    }
+});
 
 const rooms = {}; // Store room information
 
