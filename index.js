@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-
+import bodyParser from 'body-parser';
 // Initialize Express
 const app = express();
 const server = createServer(app);
@@ -13,6 +13,8 @@ app.use(cors({
     origin: "*",   // Update this if hosting frontend elsewhere
     methods: ["GET", "POST"]
 }));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ extended: true }));
 app.get('/', (req, res) => {
     res.send("url hit sucessfully").status(200);
 })
