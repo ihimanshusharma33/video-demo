@@ -9,7 +9,7 @@ const server = createServer(app);
 
 // Configure CORS
 app.use(cors({
-    origin: "http://127.0.0.1:5500",   // Update this if hosting frontend elsewhere
+    origin: "*",   // Update this if hosting frontend elsewhere
     methods: ["GET", "POST"]
 }));
 
