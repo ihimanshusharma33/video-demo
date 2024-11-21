@@ -29,59 +29,49 @@ const io = new Server(server, {
 const rooms = {}; // Store room information
 
 io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
+    console.log(`User connected: ${socket.id}`);
 
-    // Handle joining a room
-    socket.on('join-room', (roomId) => {
-        // If the room doesn't exist, create it
+    socket.on('join-room', ({ roomId, userName }) => {
         if (!rooms[roomId]) {
-            // Create an empty array to store users
             rooms[roomId] = [];
         }
 
         rooms[roomId].push(socket.id);
         socket.join(roomId);
 
-        console.log(`User ${socket.id} joined room ${roomId}`);
+        console.log(`${userName} joined room: ${roomId}`);
         io.to(socket.id).emit('room-joined');
 
-        // If this is the second user in the room, initiate the call
         if (rooms[roomId].length === 2) {
             io.to(rooms[roomId][0]).emit('initiate-call');
         }
     });
 
-    // Handle offer
     socket.on('offer', ({ roomId, offer }) => {
-        const otherUser = rooms[roomId].find(id => id !== socket.id);
+        const otherUser = rooms[roomId].find((id) => id !== socket.id);
         if (otherUser) {
             io.to(otherUser).emit('offer', offer);
         }
     });
 
-    // Handle answer
     socket.on('answer', ({ roomId, answer }) => {
-        const otherUser = rooms[roomId].find(id => id !== socket.id);
+        const otherUser = rooms[roomId].find((id) => id !== socket.id);
         if (otherUser) {
             io.to(otherUser).emit('answer', answer);
         }
     });
 
-    // Handle ICE candidates
     socket.on('ice-candidate', ({ roomId, candidate }) => {
-        const otherUser = rooms[roomId].find(id => id !== socket.id);
+        const otherUser = rooms[roomId].find((id) => id !== socket.id);
         if (otherUser) {
             io.to(otherUser).emit('ice-candidate', candidate);
         }
     });
 
-    // Handle disconnect
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-
-        // Remove the user from any rooms
+        console.log(`User disconnected: ${socket.id}`);
         for (const roomId in rooms) {
-            rooms[roomId] = rooms[roomId].filter(id => id !== socket.id);
+            rooms[roomId] = rooms[roomId].filter((id) => id !== socket.id);
             if (rooms[roomId].length === 0) {
                 delete rooms[roomId];
             }
