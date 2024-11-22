@@ -3,82 +3,116 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+
 // Initialize Express
 const app = express();
- // creating server from express
+
+// Create HTTP server from Express
 const server = createServer(app);
 const port = process.env.PORT || 3000;
+
 // Configure CORS
 app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json({ extended: true }));
+
 app.get('/', (req, res) => {
-    res.send("url hit sucessfully");
-})
+    res.send('Server is up and running!');
+});
 
 // Initialize Socket.IO
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-        allowedHeaders: ["*"],
-        credentials: true
-    }
+        origin: '*',
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['*'],
+        credentials: true,
+    },
 });
 
 const rooms = {}; // Store room information
 
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
+    console.log('A user connected:', socket.id);
 
-    socket.on('join-room', ({ roomId, userName }) => {
-        if (!rooms[roomId]) {
-            rooms[roomId] = [];
-        }
+    // Acknowledge connection
+    socket.emit('connectAck', socket.id);
 
-        rooms[roomId].push(socket.id);
-        socket.join(roomId);
-
-        console.log(`${userName} joined room: ${roomId}`);
-        io.to(socket.id).emit('room-joined');
-
-        if (rooms[roomId].length === 2) {
-            io.to(rooms[roomId][0]).emit('initiate-call');
-        }
-    });
-
-    socket.on('offer', ({ roomId, offer }) => {
-        const otherUser = rooms[roomId].find((id) => id !== socket.id);
-        if (otherUser) {
-            io.to(otherUser).emit('offer', offer);
+    // Create a room
+    socket.on('createRoom', ({ roomID, userName }) => {
+        if (rooms[roomID]) {
+            socket.emit('error', { message: 'Room already exists', status: 400 });
+        } else {
+            rooms[roomID] = {
+                host: socket.id,
+                users: [socket.id],
+                userNames: { [socket.id]: userName },
+            };
+            socket.join(roomID);
+            socket.emit('roomCreated', { roomID });
+            console.log(`Room ${roomID} created by ${userName}`);
         }
     });
 
-    socket.on('answer', ({ roomId, answer }) => {
-        const otherUser = rooms[roomId].find((id) => id !== socket.id);
-        if (otherUser) {
-            io.to(otherUser).emit('answer', answer);
+    // Join a room
+    socket.on('joinRoom', ({ roomID, userName }) => {
+        const room = rooms[roomID];
+        if (room) {
+            room.users.push(socket.id);
+            room.userNames[socket.id] = userName;
+            socket.join(roomID);
+            socket.emit('roomJoined', { roomID });
+            console.log(`${userName} joined room ${roomID}`);
+            io.to(roomID).emit('userJoined', { userName });
+        } else {
+            socket.emit('error', { message: 'Room not found', status: 404 });
         }
     });
 
-    socket.on('ice-candidate', ({ roomId, candidate }) => {
-        const otherUser = rooms[roomId].find((id) => id !== socket.id);
-        if (otherUser) {
-            io.to(otherUser).emit('ice-candidate', candidate);
+    // Handle WebRTC offer
+    socket.on('offer', ({ roomID, offer }) => {
+        const room = rooms[roomID];
+        if (room && room.host !== socket.id) {
+            io.to(room.host).emit('offer', { from: socket.id, offer });
+            console.log(`Offer sent from ${socket.id} to host of room ${roomID}`);
         }
     });
 
+    // Handle WebRTC answer
+    socket.on('answer', ({ to, answer }) => {
+        console.log(`Answer received from ${socket.id} to ${to}`);
+        io.to(to).emit('answer', { from: socket.id, answer });
+        console.log(`Answer sent from ${socket.id} to ${to}`);
+    });
+
+    // Handle ICE candidate
+    socket.on('icecandidate', ({ roomID, candidate }) => {
+        if (candidate && roomID) {
+            socket.to(roomID).emit('icecandidate', { candidate });
+            console.log('ICE candidate relayed:', candidate, 'to room', roomID);
+        } else {
+            console.warn('Invalid ICE candidate or missing roomID:', { roomID, candidate });
+        }
+    })
+    // Handle disconnection
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
-        for (const roomId in rooms) {
-            rooms[roomId] = rooms[roomId].filter((id) => id !== socket.id);
-            if (rooms[roomId].length === 0) {
-                delete rooms[roomId];
+        console.log('User disconnected:', socket.id);
+        // Remove user from rooms
+        for (const roomID in rooms) {
+            const room = rooms[roomID];
+            if (room.users.includes(socket.id)) {
+                room.users = room.users.filter((id) => id !== socket.id);
+                delete room.userNames[socket.id];
+                if (room.users.length === 0) {
+                    delete rooms[roomID];
+                    console.log(`Room ${roomID} deleted as it became empty.`);
+                }
+                break;
             }
         }
     });
 });
 
 server.listen(port, () => {
-    console.log('Server is running');
+    console.log(`Server is running on port ${port}`);
 });
