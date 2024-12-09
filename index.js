@@ -19,7 +19,6 @@ app.use(bodyParser.json({ extended: true }));
 app.get('/', (req, res) => {
     res.send('Server is up and running!');
 });
-
 // Initialize Socket.IO
 const io = new Server(server, {
     cors: {
@@ -29,14 +28,11 @@ const io = new Server(server, {
         credentials: true,
     },
 });
-
-const rooms = {}; // Store room information
+// Store room information
+let rooms = {}; // Store room information
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
-
-    // Acknowledge connection
-    socket.emit('connectAck', socket.id);
 
     // Create a room
     socket.on('createRoom', ({ roomID, userName }) => {
@@ -45,26 +41,38 @@ io.on('connection', (socket) => {
         } else {
             rooms[roomID] = {
                 host: socket.id,
-                users: [socket.id],
+                users: [],
                 userNames: { [socket.id]: userName },
             };
             socket.join(roomID);
-            socket.emit('roomCreated', { roomID });
-            console.log(`Room ${roomID} created by ${userName}`);
+            console.log(`Host ${socket.id} created room ${roomID}`);
         }
     });
-
+    socket.on('askToHost', ({ otherUser, roomID, socketID }) => {
+        const room = rooms[roomID];
+        if (!room || !room.host) {
+            console.log('host of room is not available during askto host')
+            return;
+        }
+        io.to(room.host).emit('askToHost', { otherUser, roomID, socketID })
+    })
     // Join a room
-    socket.on('joinRoom', ({ roomID, userName }) => {
+    socket.on('joinRoom', ({ otherUser, roomID, socketID }) => {
         const room = rooms[roomID];
         if (room) {
-            room.users.push(socket.id);
-            room.userNames[socket.id] = userName;
-            socket.join(roomID);
-            socket.emit('roomJoined', { roomID });
-            console.log(`${userName} joined room ${roomID}`);
-            io.to(roomID).emit('userJoined', { userName });
-        } else {
+            room.users.push(socketID);
+            room.userNames[socketID] = otherUser;
+            const targetSocket = io.sockets.sockets.get(socketID);
+            if (targetSocket) {
+                targetSocket.join(roomID);
+                console.log(`Socket ${socketID} joined room ${roomID}`);
+                io.to(room.users[0]).emit('hostAcceptOffer', { message: "host has accept your offer", otherUser, roomID });
+            } else {
+                console.log(`Socket with ID ${socketID} not found.`);
+                socket.emit('error', { message: 'Socket not found', status: 404 });
+            }
+        }
+        else {
             socket.emit('error', { message: 'Room not found', status: 404 });
         }
     });
@@ -72,46 +80,53 @@ io.on('connection', (socket) => {
     // Handle WebRTC offer
     socket.on('offer', ({ roomID, offer }) => {
         const room = rooms[roomID];
+        if (!room.host) {
+            console.log('Host of the room is not avialable')
+        }
         if (room && room.host !== socket.id) {
             io.to(room.host).emit('offer', { from: socket.id, offer });
-            console.log(`Offer sent from ${socket.id} to host of room ${roomID}`);
         }
     });
 
     // Handle WebRTC answer
     socket.on('answer', ({ to, answer }) => {
-        console.log(`Answer received from ${socket.id} to ${to}`);
         io.to(to).emit('answer', { from: socket.id, answer });
-        console.log(`Answer sent from ${socket.id} to ${to}`);
     });
 
     // Handle ICE candidate
     socket.on('icecandidate', ({ roomID, candidate }) => {
-        if (candidate && roomID) {
-            socket.to(roomID).emit('icecandidate', { candidate });
-            console.log('ICE candidate relayed:', candidate, 'to room', roomID);
+        socket.to(roomID).emit('icecandidate', { candidate });
+    });
+
+    socket.on('privateMessage', ({ FormatedMessage, socketID, roomID }) => {
+        console.log('Received message:', FormatedMessage, 'in room', roomID, 'with socketID', socketID);
+        const room = rooms[roomID];
+        if (room) {
+            io.to(roomID).emit('ReceiveMessage', { FormatedMessage, socketID, roomID });
         } else {
-            console.warn('Invalid ICE candidate or missing roomID:', { roomID, candidate });
-        }
-    })
-    // Handle disconnection
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        // Remove user from rooms
-        for (const roomID in rooms) {
-            const room = rooms[roomID];
-            if (room.users.includes(socket.id)) {
-                room.users = room.users.filter((id) => id !== socket.id);
-                delete room.userNames[socket.id];
-                if (room.users.length === 0) {
-                    delete rooms[roomID];
-                    console.log(`Room ${roomID} deleted as it became empty.`);
-                }
-                break;
-            }
+            console.log(`Room ${roomID} not found.`);
         }
     });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        for (const roomID in rooms) {
+            const room = rooms[roomID];
+            if (room.host === socket.id) {
+                delete rooms[roomID];
+                io.to(roomID).emit('roomClosed');
+            } else if (room.users.includes(socket.id)) {
+                const userIndex = room.users.indexOf(socket.id);
+                if (userIndex !== -1) room.users.splice(userIndex, 1);
+                const userName = room.userNames[socket.id];
+                delete room.userNames[socket.id];
+                io.to(roomID).emit('userLeft', { userName });
+            }
+        }
+        console.log(`User disconnected: ${socket.id}`);
+    });
 });
+
 
 server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
