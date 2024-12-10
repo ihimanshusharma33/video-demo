@@ -51,9 +51,11 @@ io.on('connection', (socket) => {
     socket.on('askToHost', ({ otherUser, roomID, socketID }) => {
         const room = rooms[roomID];
         if (!room || !room.host) {
+            console.log(room)
             console.log('host of room is not available during askto host')
             return;
         }
+        console.log('Asking to host:', room.host);
         io.to(room.host).emit('askToHost', { otherUser, roomID, socketID })
     })
     // Join a room
